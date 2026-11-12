@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vision / Digit Recognition — Live Inference</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23070a0f'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%2322d3ee' stroke-width='5'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">VISION</div>
+      <div class="brand-copy">
+        <h1>DIGIT RECOGNITION</h1>
+        <p>LIVE INFERENCE SYSTEM</p>
+      </div>
+    </div>
+    <div class="status-strip">
+      <span id="cameraStatus" class="status-chip">CAMERA OFFLINE</span>
+      <span id="apiStatus" class="status-chip checking">API CHECKING</span>
+      <span id="fpsChip" class="metric-chip">0.0 FPS</span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="panel camera-panel">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">LIVE</span>
+          <h2>CAMERA FEED</h2>
+        </div>
+        <div class="panel-actions">
+          <span id="detectionCount" class="tiny-badge">0 detections</span>
+          <span id="overlayState" class="tiny-badge">Overlay enabled</span>
+        </div>
+      </div>
+
+      <div class="stage" id="stage">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay" aria-label="Detection overlay"></canvas>
+        <div id="cameraEmpty" class="stage-empty">
+          <div class="empty-icon">◉</div>
+          <strong>Camera is off</strong>
+          <span>Start the camera to begin live inference.</span>
+        </div>
+        <div id="noDetectionHint" class="stage-hint hidden">No digits detected in this frame</div>
+        <div id="roiHint" class="stage-hint hidden">Detection stays in the center 40% by default. Drag to select a custom ROI.</div>
+      </div>
+
+      <div class="controls">
+        <div class="camera-selector">
+          <label for="cameraSelect" class="visually-hidden">Select Camera</label>
+          <select id="cameraSelect" class="form-select" disabled title="Start camera first to enumerate devices">
+            <option value="">-- Auto (Environment) --</option>
+          </select>
+        </div>
+        <button id="startCamBtn" class="btn primary">Start Camera</button>
+        <button id="stopCamBtn" class="btn" disabled>Stop Camera</button>
+        <button id="roiBtn" class="btn ghost" disabled>ROI: CENTER</button>
+        <button id="resetRoiBtn" class="btn ghost" disabled>Reset ROI</button>
+        <label class="switch">
+          <input type="checkbox" id="overlayToggle" checked />
+          <span>Overlay</span>
+        </label>
+      </div>
+
+      <div id="cameraAlert" class="alert hidden"></div>
+    </section>
+
+    <aside class="side-rail">
+      <section class="panel binary-panel">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">BINARY / LIVE</span>
+            <h2>THRESHOLD</h2>
+          </div>
+          <span id="binaryBadge" class="tiny-badge">IDLE</span>
+        </div>
+        <div class="binary-frame">
+          <img id="binaryImageA" class="binary-img hidden" alt="Binary threshold preview" />
+          <img id="binaryImageB" class="binary-img hidden" alt="" />
+          <div id="binaryEmpty" class="empty-mini">No frame yet</div>
+        </div>
+        <div class="mini-metrics">
+          <span>THRESHOLD <b id="thresholdValue">-</b></span>
+          <span>FRAME <b id="frameId">-</b></span>
+        </div>
+      </section>
+
+      <section class="panel metrics-panel">
+        <div class="metric">
+          <span>PREDICTION</span>
+          <b id="predictionValue">-</b>
+        </div>
+        <div class="metric">
+          <span>INFERENCE</span>
+          <b id="latencyValue">- ms</b>
+        </div>
+        <div class="metric">
+          <span>PROCESSING</span>
+          <b id="processingValue">0.0 FPS</b>
+        </div>
+        <div class="metric">
+          <span>CONFIDENCE</span>
+          <b id="confidenceValue">-</b>
+        </div>
+      </section>
+
+      <section class="panel settings-panel">
+        <div class="panel-head">
+          <h2>SETTINGS</h2>
+          <button id="settingsToggle" class="link-btn" type="button">Hide</button>
+        </div>
+        <div id="settingsBody">
+          <label class="field">
+            <span>Min area <b id="minAreaVal">100</b></span>
+            <input type="range" id="minArea" min="50" max="1000" step="10" value="100" />
+          </label>
+          <label class="field">
+            <span>Max area <b id="maxAreaVal">5000</b></span>
+            <input type="range" id="maxArea" min="1000" max="20000" step="500" value="5000" />
+          </label>
+          <label class="field">
+            <span>Merge gap <b id="mergeGapVal">10</b></span>
+            <input type="range" id="mergeGap" min="0" max="30" step="1" value="10" />
+          </label>
+          <label class="field">
+            <span>Padding <b id="paddingVal">4</b></span>
+            <input type="range" id="padding" min="0" max="20" step="1" value="4" />
+          </label>
+          <label class="field">
+            <span>Max digits <b id="maxDigitsVal">8</b></span>
+            <input type="range" id="maxDigits" min="1" max="10" step="1" value="8" />
+          </label>
+          <label class="field">
+            <span>Min confidence <b id="minConfidenceVal">80%</b></span>
+            <input type="range" id="minConfidence" min="0" max="95" step="5" value="80" />
+          </label>
+          <label class="field">
+            <span>Min aspect <b id="minAspectVal">0.10</b></span>
+            <input type="range" id="minAspect" min="0.05" max="1.5" step="0.05" value="0.10" />
+          </label>
+          <label class="field">
+            <span>Max aspect <b id="maxAspectVal">1.2</b></span>
+            <input type="range" id="maxAspect" min="0.5" max="12" step="0.1" value="1.2" />
+          </label>
+          <label class="field">
+            <span>Inference rate</span>
+            <select id="inferenceFps">
+              <option value="5">5 FPS</option>
+              <option value="6" selected>6 FPS</option>
+              <option value="8">8 FPS</option>
+              <option value="10">10 FPS</option>
+            </select>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="useTta" />
+            <span>TTA (slower, more robust)</span>
+          </label>
+        </div>
+      </section>
+    </aside>
+
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">LIVE MODEL OUTPUT</span>
+          <h2>PREDICTION PROBABILITIES</h2>
+        </div>
+        <div id="digitSelector" class="digit-selector"></div>
+      </div>
+      <div class="chart-status">
+        <span id="chartCaption">Waiting for a detection...</span>
+        <span id="chartNote">Model confidence / probability — not guaranteed accuracy</span>
+      </div>
+      <div class="chart-wrap">
+        <div id="chart" class="chart"></div>
+        <div id="chartEmpty" class="chart-empty">No detections yet. Start the camera or upload an image.</div>
+      </div>
+    </section>
+
+    <section class="panel history-panel">
+      <div class="panel-head">
+        <h2>RECENT PREDICTIONS</h2>
+        <span id="historyCount" class="tiny-badge">0 / 30</span>
+      </div>
+      <div id="historyList" class="history-list">
+        <span class="muted">No history</span>
+      </div>
+      <canvas id="historySpark" class="spark" aria-label="Confidence history"></canvas>
+    </section>
+
+    <section class="panel upload-panel">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">IMAGE MODE</span>
+          <h2>UPLOAD IMAGE</h2>
+        </div>
+        <span id="uploadBadge" class="tiny-badge">IDLE</span>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="upload" type="button">Upload</button>
+        <button class="tab" data-tab="camera-help" type="button">Camera tips</button>
+      </div>
+
+      <div id="panel-upload" class="tab-panel active">
+        <div class="dropzone" id="dropzone">
+          <p>Drag an image here or click to choose</p>
+          <input type="file" id="fileInput" accept="image/*" />
+        </div>
+        <img id="uploadPreview" class="upload-preview hidden" alt="preview" />
+        <button id="analyzeUploadBtn" class="btn primary">Analyze Image</button>
+      </div>
+
+      <div id="panel-camera-help" class="tab-panel">
+        <p class="muted">
+          เขียนตัวเลขด้วยปากกาสีเข้มบนกระดาษสีขาว ให้ตัวเลขอยู่ในกรอบภาพ
+          และมีช่องว่างระหว่างหลักเล็กน้อย ระบบจะวาด bounding box ทับบนวิดีโอโดยตรง
+        </p>
+      </div>
+
+      <div id="uploadAlert" class="alert hidden"></div>
+    </section>
+
+    <section class="panel upload-result hidden" id="uploadResult">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">IMAGE MODE RESULT</span>
+          <h2>UPLOAD RESULT</h2>
+        </div>
+        <span id="uploadResultNumber" class="big-number">-</span>
+      </div>
+      <div class="upload-images">
+        <figure>
+          <img id="annotatedImage" alt="annotated result" />
+          <figcaption>Bounding boxes</figcaption>
+        </figure>
+        <figure>
+          <img id="binaryImageStatic" alt="binary threshold" />
+          <figcaption>Binary threshold</figcaption>
+        </figure>
+      </div>
+      <div id="digitsContainer" class="digits-grid"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

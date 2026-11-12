@@ -1,0 +1,1 @@
+"""FastAPI backend for multi-digit handwritten number recognition."""

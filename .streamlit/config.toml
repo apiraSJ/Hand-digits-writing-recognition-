@@ -1,0 +1,19 @@
+# Streamlit config for Multi-Digit Handwritten Recognition
+[server]
+headless = true
+port = 8501
+enableCORS = false
+enableXsrfProtection = false
+
+[theme]
+primaryColor = "#4f46e5"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8f9fa"
+textColor = "#1f2937"
+
+[theme]
+font = "sans serif"
+font_size = 14
+
+[browser]
+gatherUsageStats = false
